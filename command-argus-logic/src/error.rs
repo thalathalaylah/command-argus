@@ -2,7 +2,7 @@ use thiserror::Error;
 use uuid::Uuid;
 
 #[derive(Error, Debug)]
-pub enum CommandError {
+pub enum CommandArgusError {
     #[error("Command not found: {0}")]
     NotFound(Uuid),
     
@@ -20,6 +20,12 @@ pub enum CommandError {
     
     #[error("Storage error: {0}")]
     Storage(String),
+    
+    #[error("Command execution failed: {0}")]
+    ExecutionFailed(String),
+    
+    #[error("Invalid path: {0}")]
+    InvalidPath(String),
 }
 
-pub type Result<T> = std::result::Result<T, CommandError>;
+pub type Result<T> = std::result::Result<T, CommandArgusError>;

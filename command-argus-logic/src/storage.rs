@@ -1,4 +1,4 @@
-use crate::{Command, CommandError, Result};
+use crate::{Command, CommandArgusError, Result};
 use directories::ProjectDirs;
 use std::fs;
 use std::path::PathBuf;
@@ -11,7 +11,7 @@ pub struct CommandStorage {
 impl CommandStorage {
     pub fn new() -> Result<Self> {
         let proj_dirs = ProjectDirs::from("com", "command-argus", "command-argus")
-            .ok_or_else(|| CommandError::Storage("Failed to get project directories".to_string()))?;
+            .ok_or_else(|| CommandArgusError::Storage("Failed to get project directories".to_string()))?;
         
         let storage_dir = proj_dirs.data_dir();
         fs::create_dir_all(storage_dir)?;
@@ -33,7 +33,7 @@ impl CommandStorage {
         
         // Check for duplicate names
         if commands.iter().any(|c| c.name == command.name) {
-            return Err(CommandError::DuplicateName(command.name.clone()));
+            return Err(CommandArgusError::DuplicateName(command.name.clone()));
         }
         
         commands.push(command.clone());
@@ -46,14 +46,14 @@ impl CommandStorage {
         let commands = self.load_all()?;
         commands.into_iter()
             .find(|c| c.id == id)
-            .ok_or(CommandError::NotFound(id))
+            .ok_or(CommandArgusError::NotFound(id))
     }
 
     pub fn read_by_name(&self, name: &str) -> Result<Command> {
         let commands = self.load_all()?;
         commands.into_iter()
             .find(|c| c.name == name)
-            .ok_or_else(|| CommandError::Storage(format!("Command with name '{}' not found", name)))
+            .ok_or_else(|| CommandArgusError::Storage(format!("Command with name '{}' not found", name)))
     }
 
     pub fn update(&self, id: Uuid, mut update_fn: impl FnMut(&mut Command)) -> Result<Command> {
@@ -61,7 +61,7 @@ impl CommandStorage {
         
         let command = commands.iter_mut()
             .find(|c| c.id == id)
-            .ok_or(CommandError::NotFound(id))?;
+            .ok_or(CommandArgusError::NotFound(id))?;
         
         update_fn(command);
         command.update();
@@ -79,7 +79,7 @@ impl CommandStorage {
         commands.retain(|c| c.id != id);
         
         if commands.len() == initial_len {
-            return Err(CommandError::NotFound(id));
+            return Err(CommandArgusError::NotFound(id));
         }
         
         self.save_all(&commands)?;
@@ -165,7 +165,7 @@ mod tests {
         storage.create(cmd1).unwrap();
         let result = storage.create(cmd2);
         
-        assert!(matches!(result, Err(CommandError::DuplicateName(_))));
+        assert!(matches!(result, Err(CommandArgusError::DuplicateName(_))));
     }
 
     #[test]
@@ -194,7 +194,7 @@ mod tests {
         storage.delete(created.id).unwrap();
         
         let result = storage.read(created.id);
-        assert!(matches!(result, Err(CommandError::NotFound(_))));
+        assert!(matches!(result, Err(CommandArgusError::NotFound(_))));
     }
 
     #[test]

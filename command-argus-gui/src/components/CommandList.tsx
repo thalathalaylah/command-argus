@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { Command } from '../types';
+import { Command, ExecutionResult } from '../types';
 
 interface CommandListProps {
   onEdit: (command: Command) => void;
@@ -12,6 +12,8 @@ export function CommandList({ onEdit, refreshTrigger }: CommandListProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [executingCommands, setExecutingCommands] = useState<Set<string>>(new Set());
+  const [executionResults, setExecutionResults] = useState<Map<string, ExecutionResult>>(new Map());
 
   const loadCommands = async () => {
     try {
@@ -62,6 +64,44 @@ export function CommandList({ onEdit, refreshTrigger }: CommandListProps) {
     }
   };
 
+  const handleExecute = async (commandId: string, useShell: boolean = true) => {
+    setExecutingCommands(prev => new Set(prev).add(commandId));
+    
+    try {
+      const result = await invoke<ExecutionResult>('execute_command', {
+        id: commandId,
+        useShell
+      });
+      
+      setExecutionResults(prev => new Map(prev).set(commandId, result));
+      
+      // Reload commands to update use count
+      await loadCommands();
+    } catch (err) {
+      const errorResult: ExecutionResult = {
+        stdout: '',
+        stderr: err instanceof Error ? err.message : 'Command execution failed',
+        exit_code: -1,
+        success: false
+      };
+      setExecutionResults(prev => new Map(prev).set(commandId, errorResult));
+    } finally {
+      setExecutingCommands(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(commandId);
+        return newSet;
+      });
+    }
+  };
+
+  const clearExecutionResult = (commandId: string) => {
+    setExecutionResults(prev => {
+      const newMap = new Map(prev);
+      newMap.delete(commandId);
+      return newMap;
+    });
+  };
+
   if (loading) {
     return <div className="text-center py-8">Loading commands...</div>;
   }
@@ -110,6 +150,13 @@ export function CommandList({ onEdit, refreshTrigger }: CommandListProps) {
                 <h3 className="text-lg font-semibold">{command.name}</h3>
                 <div className="flex gap-2">
                   <button
+                    onClick={() => handleExecute(command.id)}
+                    disabled={executingCommands.has(command.id)}
+                    className="px-3 py-1 text-sm bg-green-500 text-white rounded hover:bg-green-600 disabled:bg-gray-400"
+                  >
+                    {executingCommands.has(command.id) ? 'Running...' : 'Run'}
+                  </button>
+                  <button
                     onClick={() => onEdit(command)}
                     className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
                   >
@@ -150,6 +197,42 @@ export function CommandList({ onEdit, refreshTrigger }: CommandListProps) {
                   Used {command.use_count} times
                   {command.last_used_at && ` • Last used: ${new Date(command.last_used_at).toLocaleDateString()}`}
                 </div>
+                
+                {executionResults.has(command.id) && (
+                  <div className="mt-3 border-t pt-3">
+                    <div className="flex justify-between items-center mb-2">
+                      <h4 className="font-semibold text-sm">Execution Result:</h4>
+                      <button
+                        onClick={() => clearExecutionResult(command.id)}
+                        className="text-xs text-gray-500 hover:text-gray-700"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                    {(() => {
+                      const result = executionResults.get(command.id)!;
+                      return (
+                        <div className={`text-xs space-y-2 ${result.success ? '' : 'text-red-600'}`}>
+                          {result.stdout && (
+                            <div>
+                              <div className="font-semibold">Output:</div>
+                              <pre className="bg-gray-100 p-2 rounded overflow-x-auto">{result.stdout}</pre>
+                            </div>
+                          )}
+                          {result.stderr && (
+                            <div>
+                              <div className="font-semibold">Error:</div>
+                              <pre className="bg-red-50 p-2 rounded overflow-x-auto">{result.stderr}</pre>
+                            </div>
+                          )}
+                          <div className="text-gray-500">
+                            Exit code: {result.exit_code} • Status: {result.success ? 'Success' : 'Failed'}
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
               </div>
             </div>
           ))}

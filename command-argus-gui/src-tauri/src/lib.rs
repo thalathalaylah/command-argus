@@ -1,4 +1,4 @@
-use command_argus_logic::{Command, CommandStorage, EnvironmentVariable};
+use command_argus_logic::{Command, CommandStorage, EnvironmentVariable, CommandExecutor, ExecutionResult};
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use tauri::State;
@@ -7,6 +7,7 @@ use uuid::Uuid;
 // State to hold the CommandStorage instance
 struct AppState {
     storage: Mutex<CommandStorage>,
+    executor: CommandExecutor,
 }
 
 // DTOs for frontend communication
@@ -52,6 +53,14 @@ struct UpdateCommandRequest {
     working_directory: Option<String>,
     environment_variables: Option<Vec<EnvironmentVariableDto>>,
     tags: Option<Vec<String>>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct ExecutionResultDto {
+    stdout: String,
+    stderr: String,
+    exit_code: i32,
+    success: bool,
 }
 
 // Convert Command to CommandDto
@@ -185,14 +194,46 @@ fn search_commands_by_tags(tags: Vec<String>, state: State<AppState>) -> Result<
         .map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+fn execute_command(id: String, use_shell: bool, state: State<AppState>) -> Result<ExecutionResultDto, String> {
+    let uuid = Uuid::parse_str(&id).map_err(|e| e.to_string())?;
+    
+    // Get the command and mark it as used
+    let mut storage = state.storage.lock().map_err(|e| e.to_string())?;
+    let command = storage.read(uuid).map_err(|e| e.to_string())?;
+    
+    // Mark the command as used
+    storage.update(uuid, |cmd| {
+        cmd.mark_as_used();
+    }).map_err(|e| e.to_string())?;
+    
+    // Execute the command
+    let result = if use_shell {
+        state.executor.execute_with_shell(&command)
+    } else {
+        state.executor.execute(&command)
+    };
+    
+    result
+        .map(|exec_result| ExecutionResultDto {
+            stdout: exec_result.stdout,
+            stderr: exec_result.stderr,
+            exit_code: exec_result.exit_code,
+            success: exec_result.success,
+        })
+        .map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app_state = AppState {
         storage: Mutex::new(CommandStorage::new().expect("Failed to initialize storage")),
+        executor: CommandExecutor::new(),
     };
     
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_shell::init())
         .manage(app_state)
         .invoke_handler(tauri::generate_handler![
             list_commands,
@@ -201,7 +242,8 @@ pub fn run() {
             update_command,
             delete_command,
             search_commands_by_name,
-            search_commands_by_tags
+            search_commands_by_tags,
+            execute_command
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

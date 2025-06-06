@@ -37,3 +37,10 @@ export interface UpdateCommandRequest {
   environment_variables?: EnvironmentVariable[];
   tags?: string[];
 }
+
+export interface ExecutionResult {
+  stdout: string;
+  stderr: string;
+  exit_code: number;
+  success: boolean;
+}
