@@ -1,53 +1,66 @@
 import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import { invoke } from "@tauri-apps/api/core";
+import { CommandList } from "./components/CommandList";
+import { CommandForm } from "./components/CommandForm";
+import { Command } from "./types";
 import "./App.css";
 
 function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
+  const [showForm, setShowForm] = useState(false);
+  const [editingCommand, setEditingCommand] = useState<Command | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name }));
-  }
+  const handleNewCommand = () => {
+    setEditingCommand(null);
+    setShowForm(true);
+  };
+
+  const handleEditCommand = (command: Command) => {
+    setEditingCommand(command);
+    setShowForm(true);
+  };
+
+  const handleSaveCommand = () => {
+    setShowForm(false);
+    setEditingCommand(null);
+    setRefreshTrigger(prev => prev + 1);
+  };
+
+  const handleCancel = () => {
+    setShowForm(false);
+    setEditingCommand(null);
+  };
 
   return (
-    <main className="container">
-      <h1>Welcome to Tauri + React</h1>
-      <h1 className="text-3xl font-bold underline">
-         Hello world!
-      </h1>
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-6xl mx-auto p-6">
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-3xl font-bold text-gray-800">Command Argus</h1>
+            {!showForm && (
+              <button
+                onClick={handleNewCommand}
+                className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
+                New Command
+              </button>
+            )}
+          </div>
 
-      <div className="row">
-        <a href="https://vitejs.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://reactjs.org" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+          {showForm ? (
+            <CommandForm
+              editingCommand={editingCommand}
+              onSave={handleSaveCommand}
+              onCancel={handleCancel}
+            />
+          ) : (
+            <CommandList
+              onEdit={handleEditCommand}
+              refreshTrigger={refreshTrigger}
+            />
+          )}
+        </div>
       </div>
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
-
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
-        />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg}</p>
-    </main>
+    </div>
   );
 }
 
