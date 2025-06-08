@@ -1,5 +1,4 @@
 use std::process::{Command as ProcessCommand, Output};
-use std::env;
 use std::path::Path;
 use crate::command::Command;
 use crate::error::CommandArgusError;

@@ -1,4 +1,4 @@
-use command_argus_logic::{Command, CommandStorage, EnvironmentVariable, CommandExecutor, ExecutionResult};
+use command_argus_logic::{Command, CommandStorage, EnvironmentVariable, CommandExecutor};
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use tauri::State;
@@ -199,7 +199,7 @@ fn execute_command(id: String, use_shell: bool, state: State<AppState>) -> Resul
     let uuid = Uuid::parse_str(&id).map_err(|e| e.to_string())?;
     
     // Get the command and mark it as used
-    let mut storage = state.storage.lock().map_err(|e| e.to_string())?;
+    let storage = state.storage.lock().map_err(|e| e.to_string())?;
     let command = storage.read(uuid).map_err(|e| e.to_string())?;
     
     // Mark the command as used
