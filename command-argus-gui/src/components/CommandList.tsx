@@ -51,8 +51,8 @@ export function CommandList({ onEdit, refreshTrigger }: CommandListProps) {
     }
   };
 
-  const handleSearch = async () => {
-    if (!searchQuery.trim()) {
+  const handleSearch = async (query: string) => {
+    if (!query.trim()) {
       await loadCommands();
       return;
     }
@@ -60,7 +60,7 @@ export function CommandList({ onEdit, refreshTrigger }: CommandListProps) {
     try {
       setLoading(true);
       const result = await invoke<Command[]>('search_commands_by_name', {
-        query: searchQuery
+        query: query
       });
       setCommands(result);
     } catch (err) {
@@ -69,6 +69,14 @@ export function CommandList({ onEdit, refreshTrigger }: CommandListProps) {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      handleSearch(searchQuery);
+    }, 300); // 300ms debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery]);
 
   const handleExecute = async (commandId: string, useShell: boolean = true) => {
     setExecutingCommands(prev => new Set(prev).add(commandId));
@@ -124,17 +132,19 @@ export function CommandList({ onEdit, refreshTrigger }: CommandListProps) {
           placeholder="Search commands..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              setSearchQuery('');
+              loadCommands();
+            }
+          }}
           className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         <button
-          onClick={handleSearch}
-          className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          Search
-        </button>
-        <button
-          onClick={loadCommands}
+          onClick={() => {
+            setSearchQuery('');
+            loadCommands();
+          }}
           className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
         >
           Clear
