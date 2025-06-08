@@ -117,7 +117,7 @@ export function CommandList({ onEdit, refreshTrigger }: CommandListProps) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 overflow-hidden">
       <div className="flex gap-2">
         <input
           type="text"
@@ -146,11 +146,11 @@ export function CommandList({ onEdit, refreshTrigger }: CommandListProps) {
           No commands found. Create your first command!
         </div>
       ) : (
-        <div className="grid gap-4">
+        <div className="grid gap-4 overflow-y-auto max-h-[calc(100vh-300px)]">
           {commands.map((command) => (
             <div
               key={command.id}
-              className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+              className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow overflow-hidden"
             >
               <div className="flex justify-between items-start mb-2">
                 <h3 className="text-lg font-semibold">{command.name}</h3>
@@ -178,8 +178,8 @@ export function CommandList({ onEdit, refreshTrigger }: CommandListProps) {
               </div>
               
               <div className="space-y-2 text-sm">
-                <div className="font-mono bg-gray-100 p-2 rounded">
-                  {command.command} {command.args.join(' ')}
+                <div className="font-mono bg-gray-100 p-2 rounded overflow-x-auto">
+                  <span className="break-all">{command.command} {command.args.join(' ')}</span>
                 </div>
                 
                 {command.description && (
@@ -222,13 +222,13 @@ export function CommandList({ onEdit, refreshTrigger }: CommandListProps) {
                           {result.stdout && (
                             <div>
                               <div className="font-semibold">Output:</div>
-                              <pre className="bg-gray-100 p-2 rounded overflow-x-auto">{result.stdout}</pre>
+                              <pre className="bg-gray-100 p-2 rounded whitespace-pre-wrap break-words">{result.stdout}</pre>
                             </div>
                           )}
                           {result.stderr && (
                             <div>
                               <div className="font-semibold">Error:</div>
-                              <pre className="bg-red-50 p-2 rounded overflow-x-auto">{result.stderr}</pre>
+                              <pre className="bg-red-50 p-2 rounded whitespace-pre-wrap break-words">{result.stderr}</pre>
                             </div>
                           )}
                           <div className="text-gray-500">
