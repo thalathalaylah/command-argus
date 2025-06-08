@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { ask } from '@tauri-apps/plugin-dialog';
 import { Command, ExecutionResult } from '../types';
 
 interface CommandListProps {
@@ -33,7 +34,12 @@ export function CommandList({ onEdit, refreshTrigger }: CommandListProps) {
   }, [refreshTrigger]);
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this command?')) {
+    const confirmed = await ask('Are you sure you want to delete this command?', {
+      title: 'Confirm Delete',
+      kind: 'warning'
+    });
+    
+    if (!confirmed) {
       return;
     }
 
