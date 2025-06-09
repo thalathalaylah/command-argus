@@ -91,7 +91,8 @@ export function CommandForm({ editingCommand, onSave, onCancel }: CommandFormPro
           description: description || undefined,
           working_directory: workingDirectory || undefined,
           environment_variables: validEnvVars,
-          tags: tagsArray
+          tags: tagsArray,
+          parameters: []
         };
         
         await invoke('create_command', { request: createRequest });

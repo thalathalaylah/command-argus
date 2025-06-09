@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { ask } from '@tauri-apps/plugin-dialog';
 import { Command, ExecutionResult } from '../types';
+import { ParameterInputModal } from './ParameterInputModal';
 
 interface CommandListProps {
   onEdit: (command: Command) => void;
@@ -15,6 +16,7 @@ export function CommandList({ onEdit, refreshTrigger }: CommandListProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [executingCommands, setExecutingCommands] = useState<Set<string>>(new Set());
   const [executionResults, setExecutionResults] = useState<Map<string, ExecutionResult>>(new Map());
+  const [parameterModalCommand, setParameterModalCommand] = useState<Command | null>(null);
 
   const loadCommands = async () => {
     try {
@@ -78,14 +80,57 @@ export function CommandList({ onEdit, refreshTrigger }: CommandListProps) {
     return () => clearTimeout(timeoutId);
   }, [searchQuery]);
 
-  const handleExecute = async (commandId: string, useShell: boolean = true) => {
+  const handleExecute = async (command: Command, useShell: boolean = true) => {
+    // Check if command has parameters that need input
+    const fullCommand = `${command.command} ${command.args.join(' ')}`;
+    const placeholderRegex = /\$?\{([^}]+)\}/g;
+    const matches = [...fullCommand.matchAll(placeholderRegex)];
+    
+    if (matches.length > 0) {
+      // Create parameter objects from detected placeholders if command.parameters is empty or incomplete
+      const detectedPlaceholders = matches.map(match => match[1]);
+      const existingParamNames = command.parameters.map(p => p.name);
+      const missingPlaceholders = detectedPlaceholders.filter(name => !existingParamNames.includes(name));
+      
+      // Create a command with complete parameters for the modal
+      const commandWithParameters = {
+        ...command,
+        parameters: [
+          ...command.parameters,
+          ...missingPlaceholders.map(name => ({
+            name,
+            placeholder: name,
+            parameter_type: 'text' as const,
+            required: true,
+            default_value: ''
+          }))
+        ]
+      };
+      
+      setParameterModalCommand(commandWithParameters);
+      return;
+    }
+    
+    // Execute directly if no parameters
+    await executeCommand(command.id, {}, useShell);
+  };
+  
+  const executeCommand = async (commandId: string, parameters: Record<string, string>, useShell: boolean = true) => {
     setExecutingCommands(prev => new Set(prev).add(commandId));
     
     try {
-      const result = await invoke<ExecutionResult>('execute_command', {
-        id: commandId,
-        useShell
-      });
+      const hasParameters = Object.keys(parameters).length > 0;
+      const result = await invoke<ExecutionResult>(
+        hasParameters ? 'execute_command_with_parameters' : 'execute_command',
+        hasParameters ? {
+          id: commandId,
+          parameters,
+          useShell
+        } : {
+          id: commandId,
+          useShell
+        }
+      );
       
       setExecutionResults(prev => new Map(prev).set(commandId, result));
       
@@ -105,6 +150,13 @@ export function CommandList({ onEdit, refreshTrigger }: CommandListProps) {
         newSet.delete(commandId);
         return newSet;
       });
+    }
+  };
+  
+  const handleParameterSubmit = async (values: Record<string, string>) => {
+    if (parameterModalCommand) {
+      await executeCommand(parameterModalCommand.id, values, true);
+      setParameterModalCommand(null);
     }
   };
 
@@ -166,7 +218,7 @@ export function CommandList({ onEdit, refreshTrigger }: CommandListProps) {
                 <h3 className="text-lg font-semibold">{command.name}</h3>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => handleExecute(command.id)}
+                    onClick={() => handleExecute(command)}
                     disabled={executingCommands.has(command.id)}
                     className="px-3 py-1 text-sm bg-green-500 text-white rounded hover:bg-green-600 disabled:bg-gray-400"
                   >
@@ -253,6 +305,14 @@ export function CommandList({ onEdit, refreshTrigger }: CommandListProps) {
             </div>
           ))}
         </div>
+      )}
+      
+      {parameterModalCommand && (
+        <ParameterInputModal
+          parameters={parameterModalCommand.parameters}
+          onSubmit={handleParameterSubmit}
+          onCancel={() => setParameterModalCommand(null)}
+        />
       )}
     </div>
   );

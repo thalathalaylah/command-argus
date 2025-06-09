@@ -3,6 +3,17 @@ export interface EnvironmentVariable {
   value: string;
 }
 
+export interface CommandParameter {
+  name: string;
+  placeholder: string;
+  parameter_type: ParameterType;
+  required: boolean;
+  default_value?: string;
+  options?: string[];
+}
+
+export type ParameterType = 'text' | 'file' | 'directory' | 'select';
+
 export interface Command {
   id: string;
   name: string;
@@ -16,6 +27,7 @@ export interface Command {
   updated_at: string;
   last_used_at?: string;
   use_count: number;
+  parameters: CommandParameter[];
 }
 
 export interface CreateCommandRequest {
@@ -26,6 +38,7 @@ export interface CreateCommandRequest {
   working_directory?: string;
   environment_variables: EnvironmentVariable[];
   tags: string[];
+  parameters: CommandParameter[];
 }
 
 export interface UpdateCommandRequest {
@@ -36,6 +49,7 @@ export interface UpdateCommandRequest {
   working_directory?: string;
   environment_variables?: EnvironmentVariable[];
   tags?: string[];
+  parameters?: CommandParameter[];
 }
 
 export interface ExecutionResult {

@@ -1,6 +1,7 @@
-use command_argus_logic::{Command, CommandStorage, EnvironmentVariable, CommandExecutor};
+use command_argus_logic::{Command, CommandStorage, EnvironmentVariable, CommandExecutor, CommandParameter, ParameterType};
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
+use std::collections::HashMap;
 use tauri::State;
 use uuid::Uuid;
 
@@ -25,12 +26,23 @@ struct CommandDto {
     updated_at: String,
     last_used_at: Option<String>,
     use_count: u32,
+    parameters: Vec<CommandParameterDto>,
 }
 
 #[derive(Serialize, Deserialize)]
 struct EnvironmentVariableDto {
     key: String,
     value: String,
+}
+
+#[derive(Serialize, Deserialize)]
+struct CommandParameterDto {
+    name: String,
+    placeholder: String,
+    parameter_type: String,
+    required: bool,
+    default_value: Option<String>,
+    options: Option<Vec<String>>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -42,6 +54,7 @@ struct CreateCommandRequest {
     working_directory: Option<String>,
     environment_variables: Vec<EnvironmentVariableDto>,
     tags: Vec<String>,
+    parameters: Vec<CommandParameterDto>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -53,6 +66,7 @@ struct UpdateCommandRequest {
     working_directory: Option<String>,
     environment_variables: Option<Vec<EnvironmentVariableDto>>,
     tags: Option<Vec<String>>,
+    parameters: Option<Vec<CommandParameterDto>>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -61,6 +75,26 @@ struct ExecutionResultDto {
     stderr: String,
     exit_code: i32,
     success: bool,
+}
+
+// Convert ParameterType to string
+fn parameter_type_to_string(param_type: &ParameterType) -> String {
+    match param_type {
+        ParameterType::Text => "text".to_string(),
+        ParameterType::File => "file".to_string(),
+        ParameterType::Directory => "directory".to_string(),
+        ParameterType::Select => "select".to_string(),
+    }
+}
+
+// Convert string to ParameterType
+fn string_to_parameter_type(s: &str) -> ParameterType {
+    match s {
+        "file" => ParameterType::File,
+        "directory" => ParameterType::Directory,
+        "select" => ParameterType::Select,
+        _ => ParameterType::Text,
+    }
 }
 
 // Convert Command to CommandDto
@@ -84,6 +118,17 @@ fn command_to_dto(cmd: &Command) -> CommandDto {
         updated_at: cmd.updated_at.to_rfc3339(),
         last_used_at: cmd.last_used_at.map(|dt| dt.to_rfc3339()),
         use_count: cmd.use_count,
+        parameters: cmd.parameters
+            .iter()
+            .map(|p| CommandParameterDto {
+                name: p.name.clone(),
+                placeholder: p.placeholder.clone(),
+                parameter_type: parameter_type_to_string(&p.parameter_type),
+                required: p.required,
+                default_value: p.default_value.clone(),
+                options: p.options.clone(),
+            })
+            .collect(),
     }
 }
 
@@ -126,6 +171,17 @@ fn create_command(request: CreateCommandRequest, state: State<AppState>) -> Resu
         cmd.add_tag(tag);
     }
     
+    for param_dto in request.parameters {
+        cmd.add_parameter(CommandParameter {
+            name: param_dto.name,
+            placeholder: param_dto.placeholder,
+            parameter_type: string_to_parameter_type(&param_dto.parameter_type),
+            required: param_dto.required,
+            default_value: param_dto.default_value,
+            options: param_dto.options,
+        });
+    }
+    
     let storage = state.storage.lock().map_err(|e| e.to_string())?;
     storage.create(cmd)
         .map(|created_cmd| command_to_dto(&created_cmd))
@@ -163,6 +219,18 @@ fn update_command(id: String, request: UpdateCommandRequest, state: State<AppSta
         }
         if let Some(tags) = &request.tags {
             cmd.tags = tags.clone();
+        }
+        if let Some(parameters) = &request.parameters {
+            cmd.parameters = parameters.iter()
+                .map(|p| CommandParameter {
+                    name: p.name.clone(),
+                    placeholder: p.placeholder.clone(),
+                    parameter_type: string_to_parameter_type(&p.parameter_type),
+                    required: p.required,
+                    default_value: p.default_value.clone(),
+                    options: p.options.clone(),
+                })
+                .collect();
         }
         cmd.update();
     })
@@ -224,6 +292,46 @@ fn execute_command(id: String, use_shell: bool, state: State<AppState>) -> Resul
         .map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+fn execute_command_with_parameters(
+    id: String,
+    parameters: HashMap<String, String>,
+    use_shell: bool,
+    state: State<AppState>
+) -> Result<ExecutionResultDto, String> {
+    let uuid = Uuid::parse_str(&id).map_err(|e| e.to_string())?;
+    
+    // Get the command and mark it as used
+    let storage = state.storage.lock().map_err(|e| e.to_string())?;
+    let mut command = storage.read(uuid).map_err(|e| e.to_string())?;
+    
+    // Replace placeholders with parameter values
+    let (new_command, new_args) = command.replace_placeholders(&parameters);
+    command.command = new_command;
+    command.args = new_args;
+    
+    // Mark the command as used
+    storage.update(uuid, |cmd| {
+        cmd.mark_as_used();
+    }).map_err(|e| e.to_string())?;
+    
+    // Execute the command with replaced parameters
+    let result = if use_shell {
+        state.executor.execute_with_shell(&command)
+    } else {
+        state.executor.execute(&command)
+    };
+    
+    result
+        .map(|exec_result| ExecutionResultDto {
+            stdout: exec_result.stdout,
+            stderr: exec_result.stderr,
+            exit_code: exec_result.exit_code,
+            success: exec_result.success,
+        })
+        .map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app_state = AppState {
@@ -244,7 +352,8 @@ pub fn run() {
             delete_command,
             search_commands_by_name,
             search_commands_by_tags,
-            execute_command
+            execute_command,
+            execute_command_with_parameters
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

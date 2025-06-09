@@ -16,12 +16,32 @@ pub struct Command {
     pub updated_at: DateTime<Utc>,
     pub last_used_at: Option<DateTime<Utc>>,
     pub use_count: u32,
+    pub parameters: Vec<CommandParameter>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct EnvironmentVariable {
     pub key: String,
     pub value: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CommandParameter {
+    pub name: String,
+    pub placeholder: String,
+    pub parameter_type: ParameterType,
+    pub required: bool,
+    pub default_value: Option<String>,
+    pub options: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum ParameterType {
+    Text,
+    File,
+    Directory,
+    Select,
 }
 
 impl Command {
@@ -40,6 +60,7 @@ impl Command {
             updated_at: now,
             last_used_at: None,
             use_count: 0,
+            parameters: Vec::new(),
         }
     }
 
@@ -85,6 +106,57 @@ impl Command {
         let mut parts = vec![self.command.clone()];
         parts.extend(self.args.clone());
         parts.join(" ")
+    }
+
+    pub fn add_parameter(&mut self, parameter: CommandParameter) {
+        self.parameters.push(parameter);
+    }
+
+    pub fn remove_parameter(&mut self, name: &str) {
+        self.parameters.retain(|p| p.name != name);
+    }
+
+    pub fn get_parameter(&self, name: &str) -> Option<&CommandParameter> {
+        self.parameters.iter().find(|p| p.name == name)
+    }
+
+    pub fn detect_placeholders(&self) -> Vec<String> {
+        let mut placeholders = Vec::new();
+        let full_command = self.full_command();
+        
+        // Match {variable} or ${variable} patterns
+        let re = regex::Regex::new(r"\$?\{([^}]+)\}").unwrap();
+        for cap in re.captures_iter(&full_command) {
+            if let Some(name) = cap.get(1) {
+                let placeholder = name.as_str().to_string();
+                if !placeholders.contains(&placeholder) {
+                    placeholders.push(placeholder);
+                }
+            }
+        }
+        
+        placeholders
+    }
+
+    pub fn replace_placeholders(&self, values: &std::collections::HashMap<String, String>) -> (String, Vec<String>) {
+        let mut command = self.command.clone();
+        let mut args = self.args.clone();
+        
+        // Replace in command
+        for (name, value) in values {
+            command = command.replace(&format!("{{{}}}", name), value);
+            command = command.replace(&format!("${{{}}}", name), value);
+        }
+        
+        // Replace in args
+        for arg in &mut args {
+            for (name, value) in values {
+                *arg = arg.replace(&format!("{{{}}}", name), value);
+                *arg = arg.replace(&format!("${{{}}}", name), value);
+            }
+        }
+        
+        (command, args)
     }
 }
 

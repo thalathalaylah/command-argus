@@ -1,0 +1,35 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+        {
+            "type": "shell",
+            "command": "npm",
+            "args": [
+                "run",
+                "tauri",
+                "dev"
+            ],
+            "problemMatcher": [],
+            "label": "npm: run tauri dev - command-argus-gui",
+            "detail": "tauri",
+            "options": {
+                "cwd": "${workspaceFolder}/command-argus-gui"
+            }
+        },
+        {
+            "type": "shell",
+            "command": "npm",
+            "args": [
+                "run",
+                "tauri",
+                "build"
+            ],
+            "problemMatcher": [],
+            "label": "npm: run tauri build - command-argus-gui",
+            "detail": "tauri",
+            "options": {
+                "cwd": "${workspaceFolder}/command-argus-gui"
+            }
+        },
+    ]
+}
