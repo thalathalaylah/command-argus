@@ -46,6 +46,33 @@ impl CommandExecutor {
             process.current_dir(path);
         }
         
+        // On macOS, ensure common paths are included in PATH
+        #[cfg(target_os = "macos")]
+        {
+            use std::env;
+            
+            let mut path_env = env::var("PATH").unwrap_or_default();
+            let additional_paths = vec![
+                "/opt/homebrew/bin",
+                "/usr/local/bin",
+                "/usr/bin",
+                "/bin",
+                "/usr/sbin",
+                "/sbin",
+            ];
+            
+            for additional_path in additional_paths {
+                if !path_env.contains(additional_path) {
+                    if !path_env.is_empty() {
+                        path_env.push(':');
+                    }
+                    path_env.push_str(additional_path);
+                }
+            }
+            
+            process.env("PATH", path_env);
+        }
+        
         // Set environment variables
         for env_var in &command.environment_variables {
             process.env(&env_var.key, &env_var.value);
@@ -82,6 +109,33 @@ impl CommandExecutor {
                 return Err(CommandArgusError::InvalidPath(working_dir.clone()));
             }
             process.current_dir(path);
+        }
+        
+        // On macOS, ensure common paths are included in PATH
+        #[cfg(target_os = "macos")]
+        {
+            use std::env;
+            
+            let mut path_env = env::var("PATH").unwrap_or_default();
+            let additional_paths = vec![
+                "/opt/homebrew/bin",
+                "/usr/local/bin",
+                "/usr/bin",
+                "/bin",
+                "/usr/sbin",
+                "/sbin",
+            ];
+            
+            for additional_path in additional_paths {
+                if !path_env.contains(additional_path) {
+                    if !path_env.is_empty() {
+                        path_env.push(':');
+                    }
+                    path_env.push_str(additional_path);
+                }
+            }
+            
+            process.env("PATH", path_env);
         }
         
         // Set environment variables
