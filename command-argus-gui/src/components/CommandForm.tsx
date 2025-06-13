@@ -16,6 +16,7 @@ export function CommandForm({ editingCommand, onSave, onCancel }: CommandFormPro
   const [workingDirectory, setWorkingDirectory] = useState('');
   const [tags, setTags] = useState('');
   const [envVars, setEnvVars] = useState<EnvironmentVariable[]>([]);
+  const [miseEnabled, setMiseEnabled] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -27,6 +28,7 @@ export function CommandForm({ editingCommand, onSave, onCancel }: CommandFormPro
       setWorkingDirectory(editingCommand.working_directory || '');
       setTags(editingCommand.tags.join(', '));
       setEnvVars(editingCommand.environment_variables);
+      setMiseEnabled(editingCommand.mise_enabled || false);
     } else {
       // Reset form for new command
       setName('');
@@ -36,6 +38,7 @@ export function CommandForm({ editingCommand, onSave, onCancel }: CommandFormPro
       setWorkingDirectory('');
       setTags('');
       setEnvVars([]);
+      setMiseEnabled(false);
     }
   }, [editingCommand]);
 
@@ -76,7 +79,8 @@ export function CommandForm({ editingCommand, onSave, onCancel }: CommandFormPro
           description: description || undefined,
           working_directory: workingDirectory || undefined,
           environment_variables: validEnvVars,
-          tags: tagsArray
+          tags: tagsArray,
+          mise_enabled: miseEnabled
         };
         
         await invoke('update_command', {
@@ -92,7 +96,8 @@ export function CommandForm({ editingCommand, onSave, onCancel }: CommandFormPro
           working_directory: workingDirectory || undefined,
           environment_variables: validEnvVars,
           tags: tagsArray,
-          parameters: []
+          parameters: [],
+          mise_enabled: miseEnabled
         };
         
         await invoke('create_command', { request: createRequest });
@@ -174,6 +179,18 @@ export function CommandForm({ editingCommand, onSave, onCancel }: CommandFormPro
           placeholder="Comma-separated tags"
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
+      </div>
+
+      <div>
+        <label className="flex items-center space-x-2">
+          <input
+            type="checkbox"
+            checked={miseEnabled}
+            onChange={(e) => setMiseEnabled(e.target.checked)}
+            className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+          />
+          <span className="text-sm font-medium">Enable mise (activate mise environment before execution)</span>
+        </label>
       </div>
 
       <div>

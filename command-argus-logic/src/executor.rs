@@ -89,7 +89,7 @@ impl CommandExecutor {
         let shell_command = if cfg!(target_os = "windows") {
             "cmd"
         } else {
-            "sh"
+            "zsh"
         };
         
         let shell_arg = if cfg!(target_os = "windows") {
@@ -100,7 +100,16 @@ impl CommandExecutor {
         
         let mut process = ProcessCommand::new(shell_command);
         process.arg(shell_arg);
-        process.arg(&command.full_command());
+        
+        // Build the command to execute
+        let command_to_execute = if command.mise_enabled && !cfg!(target_os = "windows") {
+            // Prepend mise activation for non-Windows systems
+            format!("eval \"$(mise activate zsh)\" && {}", command.full_command())
+        } else {
+            command.full_command()
+        };
+        
+        process.arg(&command_to_execute);
         
         // Set working directory if specified
         if let Some(ref working_dir) = command.working_directory {

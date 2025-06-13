@@ -28,6 +28,7 @@ export interface Command {
   last_used_at?: string;
   use_count: number;
   parameters: CommandParameter[];
+  mise_enabled: boolean;
 }
 
 export interface CreateCommandRequest {
@@ -39,6 +40,7 @@ export interface CreateCommandRequest {
   environment_variables: EnvironmentVariable[];
   tags: string[];
   parameters: CommandParameter[];
+  mise_enabled?: boolean;
 }
 
 export interface UpdateCommandRequest {
@@ -50,6 +52,7 @@ export interface UpdateCommandRequest {
   environment_variables?: EnvironmentVariable[];
   tags?: string[];
   parameters?: CommandParameter[];
+  mise_enabled?: boolean;
 }
 
 export interface ExecutionResult {

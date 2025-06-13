@@ -27,6 +27,7 @@ struct CommandDto {
     last_used_at: Option<String>,
     use_count: u32,
     parameters: Vec<CommandParameterDto>,
+    mise_enabled: bool,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -55,6 +56,7 @@ struct CreateCommandRequest {
     environment_variables: Vec<EnvironmentVariableDto>,
     tags: Vec<String>,
     parameters: Vec<CommandParameterDto>,
+    mise_enabled: Option<bool>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -67,6 +69,7 @@ struct UpdateCommandRequest {
     environment_variables: Option<Vec<EnvironmentVariableDto>>,
     tags: Option<Vec<String>>,
     parameters: Option<Vec<CommandParameterDto>>,
+    mise_enabled: Option<bool>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -129,6 +132,7 @@ fn command_to_dto(cmd: &Command) -> CommandDto {
                 options: p.options.clone(),
             })
             .collect(),
+        mise_enabled: cmd.mise_enabled,
     }
 }
 
@@ -182,6 +186,10 @@ fn create_command(request: CreateCommandRequest, state: State<AppState>) -> Resu
         });
     }
     
+    if let Some(mise_enabled) = request.mise_enabled {
+        cmd.mise_enabled = mise_enabled;
+    }
+    
     let storage = state.storage.lock().map_err(|e| e.to_string())?;
     storage.create(cmd)
         .map(|created_cmd| command_to_dto(&created_cmd))
@@ -231,6 +239,9 @@ fn update_command(id: String, request: UpdateCommandRequest, state: State<AppSta
                     options: p.options.clone(),
                 })
                 .collect();
+        }
+        if let Some(mise_enabled) = request.mise_enabled {
+            cmd.mise_enabled = mise_enabled;
         }
         cmd.update();
     })

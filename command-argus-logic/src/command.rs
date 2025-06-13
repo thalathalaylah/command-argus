@@ -17,6 +17,7 @@ pub struct Command {
     pub last_used_at: Option<DateTime<Utc>>,
     pub use_count: u32,
     pub parameters: Vec<CommandParameter>,
+    pub mise_enabled: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -61,6 +62,7 @@ impl Command {
             last_used_at: None,
             use_count: 0,
             parameters: Vec::new(),
+            mise_enabled: false,
         }
     }
 
@@ -76,6 +78,11 @@ impl Command {
 
     pub fn with_working_directory(mut self, dir: String) -> Self {
         self.working_directory = Some(dir);
+        self
+    }
+
+    pub fn with_mise_enabled(mut self, enabled: bool) -> Self {
+        self.mise_enabled = enabled;
         self
     }
 
